@@ -8,11 +8,13 @@ Click here to watch a screencast of the KSQL demo on YouTube.
 <a href="https://youtu.be/A45uRzJiv7I" target="_blank"><img src="screencast.jpg" alt="KSQL screencast"></a></p>
 <!-- [![KSQL screencast](screencast.jpg)](https://youtu.be/A45uRzJiv7I) -->
 
+[RELEASE]: https://github.com/confluentinc/ksql/tree/v0.3
+
 # Quick Start
 If you are ready to see the power of KSQL, try out these:
 
-- [KSQL Quick Start](/docs/quickstart#quick-start): Demonstrates a simple workflow using KSQL to write streaming queries against data in Kafka.
-- [Clickstream Analysis Demo](/ksql-clickstream-demo#clickstream-analysis): Shows how to build an application that performs real-time user analytics.
+- [KSQL Quick Start]([RELEASE]/docs/quickstart#quick-start): Demonstrates a simple workflow using KSQL to write streaming queries against data in Kafka.
+- [Clickstream Analysis Demo]([RELEASE]/ksql-clickstream-demo#clickstream-analysis): Shows how to build an application that performs real-time user analytics.
 
 # Use Cases and Examples
 
@@ -61,7 +63,7 @@ CREATE TABLE error_counts AS
 
 
 # Documentation
-You can [find the KSQL documentation here](/docs#ksql-documentation).
+You can [find the KSQL documentation here]([RELEASE]/docs#ksql-documentation).
 
 # Join the Community
 Whether you need help, want to contribute, or are just looking for the latest news, you can find out how to [connect with your fellow Confluent community members here](https://www.confluent.io/contact-us-thank-you/).
