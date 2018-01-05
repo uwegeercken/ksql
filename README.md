@@ -79,6 +79,6 @@ The project is licensed under the Apache License, version 2.0.
 
 *Apache, Apache Kafka, Kafka, and associated open source project names are trademarks of the [Apache Software Foundation](https://www.apache.org/).*
 
-[Quick Start] https://github.com/confluentinc/ksql/tree/v0.3/docs/quickstart#quick-start
-[Demo] https://github.com/confluentinc/ksql/tree/v0.3/ksql-clickstream-demo#clickstream-analysis
-[Documentation] https://github.com/confluentinc/ksql/tree/v0.3/docs#ksql-documentation
+[Quick Start]: https://github.com/confluentinc/ksql/tree/v0.3/docs/quickstart#quick-start
+[Demo]: https://github.com/confluentinc/ksql/tree/v0.3/ksql-clickstream-demo#clickstream-analysis
+[Documentation]: https://github.com/confluentinc/ksql/tree/v0.3/docs#ksql-documentation
