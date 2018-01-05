@@ -8,8 +8,6 @@ Click here to watch a screencast of the KSQL demo on YouTube.
 <a href="https://youtu.be/A45uRzJiv7I" target="_blank"><img src="screencast.jpg" alt="KSQL screencast"></a></p>
 <!-- [![KSQL screencast](screencast.jpg)](https://youtu.be/A45uRzJiv7I) -->
 
-[RELEASE]: https://github.com/confluentinc/ksql/tree/v0.3
-
 # Quick Start
 If you are ready to see the power of KSQL, try out these:
 
@@ -81,3 +79,4 @@ The project is licensed under the Apache License, version 2.0.
 
 *Apache, Apache Kafka, Kafka, and associated open source project names are trademarks of the [Apache Software Foundation](https://www.apache.org/).*
 
+[RELEASE]: https://github.com/confluentinc/ksql/tree/v0.3
