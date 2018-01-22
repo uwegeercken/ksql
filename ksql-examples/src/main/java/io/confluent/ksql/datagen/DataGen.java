@@ -76,12 +76,13 @@ public class DataGen {
         return;
     }
 
-    Properties props = new Properties();
+    Properties props = arguments.properties;
     props.put("bootstrap.servers", arguments.bootstrapServer);
     props.put("client.id", "KSQLDataGenProducer");
+    System.out.println("Producer Properties:" + props);
 
     dataProducer.populateTopic(props, generator, arguments.topicName, arguments.keyName,
-                               arguments.iterations, arguments.maxInterval);
+                               arguments.iterations, arguments.maxInterval, arguments.printRows);
   }
 
   private static void usage() {
@@ -117,6 +118,8 @@ public class DataGen {
     public final int iterations;
     public final long maxInterval;
     public final String schemaRegistryUrl;
+    public final boolean printRows;
+    public final Properties properties;
 
     public Arguments(
         boolean help,
@@ -127,7 +130,9 @@ public class DataGen {
         String keyName,
         int iterations,
         long maxInterval,
-        String schemaRegistryUrl
+        String schemaRegistryUrl,
+        boolean printRows,
+        Properties properties
     ) {
       this.help = help;
       this.bootstrapServer = bootstrapServer;
@@ -138,6 +143,8 @@ public class DataGen {
       this.iterations = iterations;
       this.maxInterval = maxInterval;
       this.schemaRegistryUrl = schemaRegistryUrl;
+      this.printRows = printRows;
+      this.properties = properties;
     }
 
     public static class ArgumentParseException extends RuntimeException {
@@ -158,6 +165,8 @@ public class DataGen {
       private int iterations;
       private long maxInterval;
       private String schemaRegistryUrl;
+      private boolean printRows;
+      private Properties properties;
 
       public Builder() {
         quickstart = null;
@@ -170,6 +179,8 @@ public class DataGen {
         iterations = 1000000;
         maxInterval = -1;
         schemaRegistryUrl = "http://localhost:8081";
+        printRows = true;
+        properties = new Properties();
       }
 
       private enum Quickstart {
@@ -212,7 +223,8 @@ public class DataGen {
 
       public Arguments build() {
         if (help) {
-          return new Arguments(true, null, null, null, null, null, 0, -1, null);
+          return new Arguments(true, null, null, null, null,
+              null, 0, -1, null, true, null);
         }
 
         if (quickstart != null) {
@@ -231,7 +243,7 @@ public class DataGen {
           throw new ArgumentParseException(exception.getMessage());
         }
         return new Arguments(help, bootstrapServer, schemaFile, format, topicName, keyName,
-                             iterations, maxInterval, schemaRegistryUrl);
+                             iterations, maxInterval, schemaRegistryUrl, printRows, properties);
       }
 
       public Builder parseArgs(String[] args) throws IOException {
@@ -273,6 +285,13 @@ public class DataGen {
           ));
         }
 
+        if (argName.startsWith("producer")) {
+          String property = argName.substring("producer".length() + 1);
+          Object value = parsePropertyValue(argValue);
+          properties.put(property, value);
+          return this;
+        }
+
         switch (argName) {
           case "quickstart":
             try {
@@ -305,10 +324,13 @@ public class DataGen {
             iterations = parseIterations(argValue);
             break;
           case "maxInterval":
-            maxInterval = parseIterations(argValue);
+            maxInterval = parseMaxInterval(argValue);
             break;
           case "schemaRegistryUrl":
             schemaRegistryUrl = argValue;
+            break;
+          case "printRows":
+            printRows = parsePrintRows(argValue);
             break;
           default:
             throw new ArgumentParseException(String.format(
@@ -351,7 +373,7 @@ public class DataGen {
       private long parseMaxInterval(String maxIntervalString) {
         try {
           long result = Long.valueOf(maxIntervalString, 10);
-          if (result <= 0) {
+          if (result < 0) {
             throw new ArgumentParseException(String.format(
                 "Invalid number of maxInterval in '%d'; must be a positive number",
                 result
@@ -363,6 +385,35 @@ public class DataGen {
               "Invalid number of maxInterval in '%s'; must be a valid base 10 long",
               maxIntervalString
           ));
+        }
+      }
+
+      private boolean parsePrintRows(String printRowsString) {
+        switch(printRowsString.toLowerCase()) {
+          case "false":
+            return false;
+          case "true":
+            return true;
+          default:
+            throw new ArgumentParseException(String.format(
+                "Invalid value for printRows in '%s'; must be true or false",
+                printRowsString
+            ));
+        }
+      }
+
+      private Object parsePropertyValue(String propertyValueString) {
+        String[] split = propertyValueString.split(",", 2);
+        if (split.length != 2) {
+          throw new ArgumentParseException("Invalid value for property in %s; must be in format <type>,<value>");
+        }
+        switch(split[0]) {
+          case "int":
+            return Integer.valueOf(split[1]);
+          case "string":
+            return split[1];
+          default:
+            throw new ArgumentParseException("Invalid type for property in %s; must be string or int");
         }
       }
     }
