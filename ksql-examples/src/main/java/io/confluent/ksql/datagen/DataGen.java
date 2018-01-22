@@ -28,6 +28,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Random;
+import java.util.List;
+import java.util.LinkedList;
 
 public class DataGen {
 
@@ -76,13 +78,29 @@ public class DataGen {
         return;
     }
 
-    Properties props = arguments.properties;
-    props.put("bootstrap.servers", arguments.bootstrapServer);
-    props.put("client.id", "KSQLDataGenProducer");
-    System.out.println("Producer Properties:" + props);
+    List<Thread> threads = new LinkedList<>();
+    for (int i = 0; i < arguments.numThreads; i++) {
+      Properties props = arguments.properties;
+      props.put("bootstrap.servers", arguments.bootstrapServer);
+      props.put("client.id", "KSQLDataGenProducer");
+      System.out.println("Producer Properties:" + props);
 
-    dataProducer.populateTopic(props, generator, arguments.topicName, arguments.keyName,
-                               arguments.iterations, arguments.maxInterval, arguments.printRows);
+      Thread t = new Thread(() -> {
+        dataProducer.populateTopic(props, generator, arguments.topicName, arguments.keyName,
+            arguments.iterations, arguments.maxInterval, arguments.printRows);
+      });
+      t.setDaemon(true);
+      t.start();
+      threads.add(t);
+    }
+    for (Thread t : threads) {
+      try {
+        t.join();
+      } catch (InterruptedException e) {
+        // interrupted. exit with error
+        System.exit(1);
+      }
+    }
   }
 
   private static void usage() {
@@ -120,6 +138,7 @@ public class DataGen {
     public final String schemaRegistryUrl;
     public final boolean printRows;
     public final Properties properties;
+    public final int numThreads;
 
     public Arguments(
         boolean help,
@@ -132,7 +151,8 @@ public class DataGen {
         long maxInterval,
         String schemaRegistryUrl,
         boolean printRows,
-        Properties properties
+        Properties properties,
+        int numThreads
     ) {
       this.help = help;
       this.bootstrapServer = bootstrapServer;
@@ -145,6 +165,7 @@ public class DataGen {
       this.schemaRegistryUrl = schemaRegistryUrl;
       this.printRows = printRows;
       this.properties = properties;
+      this.numThreads = numThreads;
     }
 
     public static class ArgumentParseException extends RuntimeException {
@@ -167,6 +188,7 @@ public class DataGen {
       private String schemaRegistryUrl;
       private boolean printRows;
       private Properties properties;
+      private int numThreads;
 
       public Builder() {
         quickstart = null;
@@ -181,6 +203,7 @@ public class DataGen {
         schemaRegistryUrl = "http://localhost:8081";
         printRows = true;
         properties = new Properties();
+        numThreads = 1;
       }
 
       private enum Quickstart {
@@ -224,7 +247,7 @@ public class DataGen {
       public Arguments build() {
         if (help) {
           return new Arguments(true, null, null, null, null,
-              null, 0, -1, null, true, null);
+              null, 0, -1, null, true, null, 1);
         }
 
         if (quickstart != null) {
@@ -243,7 +266,7 @@ public class DataGen {
           throw new ArgumentParseException(exception.getMessage());
         }
         return new Arguments(help, bootstrapServer, schemaFile, format, topicName, keyName,
-                             iterations, maxInterval, schemaRegistryUrl, printRows, properties);
+                             iterations, maxInterval, schemaRegistryUrl, printRows, properties, numThreads);
       }
 
       public Builder parseArgs(String[] args) throws IOException {
@@ -332,6 +355,9 @@ public class DataGen {
           case "printRows":
             printRows = parsePrintRows(argValue);
             break;
+          case "numThreads":
+            numThreads = parseNThreads(argValue);
+            break;
           default:
             throw new ArgumentParseException(String.format(
                 "Unknown argument name in '%s'",
@@ -367,6 +393,22 @@ public class DataGen {
               "Invalid number of iterations in '%s'; must be a valid base 10 integer",
               iterationsString
           ));
+        }
+      }
+
+      private int parseNThreads(String numThreadsString) {
+        try {
+          int result = Integer.valueOf(numThreadsString, 10);
+          if (result < 0) {
+            throw new ArgumentParseException(String.format(
+                "Invalid number of threads in '%d'; must be a positive number",
+                result));
+          }
+          return result;
+        } catch (NumberFormatException e) {
+          throw new ArgumentParseException(String.format(
+              "Invalid number of threads in '%s'; must be a positive number",
+              numThreadsString));
         }
       }
 
