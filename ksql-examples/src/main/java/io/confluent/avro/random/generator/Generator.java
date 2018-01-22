@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Generates Java objects according to an {@link Schema Avro Schema}.
@@ -1107,8 +1108,9 @@ public class Generator {
 
   private String generateRandomString(int length) {
     byte[] bytes = new byte[length];
+    ThreadLocalRandom tlRandom = ThreadLocalRandom.current();
     for (int i = 0; i < length; i++) {
-      bytes[i] = (byte)((byte)'a' + (byte) random.nextInt(26));
+      bytes[i] = (byte)((byte)'a' + ((byte) tlRandom.nextInt(32) % 26));
     }
     return new String(bytes, StandardCharsets.US_ASCII);
   }
