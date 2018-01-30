@@ -81,7 +81,7 @@ public class ConsumerCollector implements MetricCollector {
   @SuppressWarnings("unchecked")
   private void collect(ConsumerRecords consumerRecords) {
     Stream<ConsumerRecord> stream = StreamSupport.stream(consumerRecords.spliterator(), false);
-    stream.forEach(record -> record(record.topic().toLowerCase(), false));
+    stream.forEach(record -> record(record.topic(), false));
   }
 
   public void recordError(String topic) {

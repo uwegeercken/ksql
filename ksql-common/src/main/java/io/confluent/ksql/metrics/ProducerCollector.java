@@ -64,11 +64,11 @@ public class ProducerCollector implements MetricCollector {
   }
 
   public void recordError(String topic) {
-    collect(true, topic.toLowerCase());
+    collect(true, topic);
   }
 
   private void collect(ProducerRecord record, boolean isError) {
-    collect(isError, record.topic().toLowerCase());
+    collect(isError, record.topic());
   }
 
   private void collect(boolean isError, String topic) {

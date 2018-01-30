@@ -52,7 +52,7 @@ class TopicSensors<R> {
   }
 
   boolean isTopic(String topic) {
-    return this.topic.equals(topic);
+    return this.topic.equalsIgnoreCase(topic);
   }
 
   Collection<Stat> stats(boolean isError) {
