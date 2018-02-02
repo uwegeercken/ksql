@@ -1,13 +1,32 @@
+/**
+ * Copyright 2017 Confluent Inc.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ **/
+
 package io.confluent.ksql;
 
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.afterburner.AfterburnerModule;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -15,31 +34,30 @@ import org.apache.kafka.common.serialization.StringSerializer;
 
 
 public class DeSerStream {
-  static class TestRecord {
-    public long longField1;
-    public long longField2;
-    public String stringField;
-
-
+  public static class TestRecord {
+    public long long_field_1;
+    public long long_field_2;
+    public String string_field;
   }
 
-  public static class JSONDeserializer<T> implements Deserializer<T> {
-    Class<T> tClass;
-    ObjectMapper objectMapper;
+  public static class TestRecordDeserializer implements Deserializer<TestRecord> {
+    public ObjectMapper objectMapper;
 
-    JSONDeserializer() {
+    public TestRecordDeserializer() {
       objectMapper = new ObjectMapper();
       objectMapper.registerModule(new AfterburnerModule());
+      objectMapper.setVisibility(PropertyAccessor.ALL, Visibility.NONE);
+      objectMapper.setVisibility(PropertyAccessor.FIELD, Visibility.ANY);
     }
 
     @Override
-    public void close() {
-    }
+    public void close() {}
 
     @Override
-    public T deserialize(String topic, byte[] bytes) {
+    public TestRecord deserialize(String topic, byte[] bytes) {
       try {
-        return objectMapper.readValue(bytes, tClass);
+        String s = new String(bytes);
+        return objectMapper.readValue(bytes, TestRecord.class);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -47,27 +65,22 @@ public class DeSerStream {
 
     @SuppressWarnings("unchecked")
     @Override
-    public void configure(Map<String, ?> props, boolean key) {
-      tClass = (Class<T>) props.get("JsonPOJOClass");
-
-    }
+    public void configure(Map<String, ?> props, boolean key) {}
   }
 
-  public static class JSONSerializer<T> implements Serializer<T> {
-    Class<T> tClass;
-    ObjectMapper objectMapper;
+  public static class TestRecordSerializer implements Serializer<TestRecord> {
+    public ObjectMapper objectMapper;
 
-    JSONSerializer() {
+    public TestRecordSerializer() {
       objectMapper = new ObjectMapper();
       objectMapper.registerModule(new AfterburnerModule());
     }
 
     @Override
-    public void close() {
-    }
+    public void close() {}
 
     @Override
-    public byte[] serialize(String topic, T data) {
+    public byte[] serialize(String topic, TestRecord data) {
       try {
         return objectMapper.writeValueAsBytes(data);
       } catch (Exception e) {
@@ -77,40 +90,83 @@ public class DeSerStream {
 
     @SuppressWarnings("unchecked")
     @Override
-    public void configure(Map<String, ?> props, boolean key) {
-      tClass = (Class<T>) props.get("JsonPOJOClass");
-
-    }
+    public void configure(Map<String, ?> props, boolean key) {}
   }
 
-  static void go(String brokerAddress, String srcTopic, String dstTopic) {
+  static boolean keepRunning = true;
+
+  static void go(List<Long> counts, int i, String brokerAddress, String srcTopic,
+                 String dstTopic, int bufferSz, int bufferMemory) {
     Properties cProps = new Properties();
     cProps.put("bootstrap.servers", brokerAddress);
     cProps.put("group.id", "consumer-test-tp");
     cProps.put("key.deserializer", StringDeserializer.class.getName());
-    cProps.put("value.deserializer", JSONDeserializer.class.getName());
-    KafkaConsumer<String, String> consumer = new KafkaConsumer<>(cProps);
+    cProps.put("value.deserializer", TestRecordDeserializer.class.getName());
+    cProps.put("auto.offset.reset", "earliest");
+    KafkaConsumer<String, TestRecord> consumer = new KafkaConsumer<>(cProps);
 
     Properties pProps = new Properties();
-    pProps.put("boostrap.server", "localhost:9092");
+    pProps.put("bootstrap.servers", brokerAddress);
     pProps.put("acks", "all");
     pProps.put("retries", 0);
-    pProps.put("batch.size", 16384);
+    pProps.put("batch.size", bufferSz);
     pProps.put("linger.ms", 1);
-    pProps.put("buffer.memory", 33554432);
+    pProps.put("buffer.memory", bufferMemory);
     pProps.put("key.serializer", StringSerializer.class.getName());
-    pProps.put("value.serializer", JSONSerializer.class.getName());
-    KafkaProducer<String, String> producer = new KafkaProducer<>(pProps);
+    pProps.put("value.serializer", TestRecordSerializer.class.getName());
+    KafkaProducer<String, TestRecord> producer = new KafkaProducer<>(pProps);
 
     consumer.subscribe(Arrays.asList(srcTopic));
 
-    while (true) {
-      ConsumerRecords<String, String> records = consumer.poll(1000);
+    System.out.println("Go!");
+
+    while (keepRunning) {
+      ConsumerRecords<String, TestRecord> records = consumer.poll(1000);
+      for (ConsumerRecord<String, TestRecord> r : records) {
+        producer.send(new ProducerRecord<>(dstTopic, r.key(), r.value()));
+        counts.set(i, counts.get(i) + 1);
+      }
     }
+
+    consumer.close();
+    producer.close();
   }
 
-  static int main(String[] args) {
-    go(args[1], args[2], args[3]);
-    return 0;
+  public static void main(String[] args) {
+    List<Thread> threads = new LinkedList<>();
+    ArrayList<Long> counts = new ArrayList<>();
+    for (int i = 0; i < Integer.valueOf(args[0]); i++) {
+      counts.add((long)0);
+      final int c = i;
+      Thread t = new Thread(() -> {
+          go(counts, c, args[1], args[2], args[3],
+              Integer.valueOf(args[4]), Integer.valueOf(args[5]));
+        }
+      );
+      // t.setDaemon(true);
+      t.start();
+      threads.add(t);
+    }
+
+    long total = 0;
+
+    Thread stopThread = new Thread() {
+      public void run() {
+        keepRunning = false;
+        for (Thread t : threads) {
+          try {
+            t.join();
+          } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+          }
+        }
+        int total = 0;
+        for (int i = 0; i < threads.size(); i++) {
+          total += counts.get(i);
+        }
+        System.out.println("Total: " + Integer.toString(total));
+      }
+    };
+    Runtime.getRuntime().addShutdownHook(stopThread);
   }
 }
