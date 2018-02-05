@@ -108,9 +108,9 @@ public class DeSerStream {
     Properties pProps = new Properties();
     pProps.put("bootstrap.servers", brokerAddress);
     pProps.put("acks", "all");
-    pProps.put("retries", 0);
+    pProps.put("retries", 10);
     pProps.put("batch.size", bufferSz);
-    pProps.put("linger.ms", 1);
+    pProps.put("linger.ms", 100);
     pProps.put("buffer.memory", bufferMemory);
     pProps.put("key.serializer", StringSerializer.class.getName());
     pProps.put("value.serializer", TestRecordSerializer.class.getName());
