@@ -27,10 +27,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.Deserializer;
-import org.apache.kafka.common.serialization.Serializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.common.serialization.*;
 
 
 public class DeSerStream {
@@ -56,7 +53,6 @@ public class DeSerStream {
     @Override
     public TestRecord deserialize(String topic, byte[] bytes) {
       try {
-        String s = new String(bytes);
         return objectMapper.readValue(bytes, TestRecord.class);
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -99,7 +95,8 @@ public class DeSerStream {
                  String dstTopic, int bufferSz, int bufferMemory) {
     Properties cProps = new Properties();
     cProps.put("bootstrap.servers", brokerAddress);
-    cProps.put("group.id", "consumer-test-tp");
+    Random rnd = new Random();
+    cProps.put("group.id", "consumer-test-tp-" + rnd.nextInt());
     cProps.put("key.deserializer", StringDeserializer.class.getName());
     cProps.put("value.deserializer", TestRecordDeserializer.class.getName());
     cProps.put("auto.offset.reset", "earliest");
@@ -118,12 +115,12 @@ public class DeSerStream {
 
     consumer.subscribe(Arrays.asList(srcTopic));
 
-    System.out.println("Go!");
+    System.out.println(String.format("Go src(%s) dst(%s) bufferSz(%d) bufferMem(%d)", srcTopic, dstTopic, bufferSz, bufferMemory));
 
     while (keepRunning) {
       ConsumerRecords<String, TestRecord> records = consumer.poll(1000);
       for (ConsumerRecord<String, TestRecord> r : records) {
-        producer.send(new ProducerRecord<>(dstTopic, r.key(), r.value()));
+        producer.send(new ProducerRecord<>(dstTopic, Long.toString(r.value().long_field_1), r.value()));
         counts.set(i, counts.get(i) + 1);
       }
     }
