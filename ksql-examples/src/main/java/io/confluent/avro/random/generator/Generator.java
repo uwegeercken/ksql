@@ -61,6 +61,7 @@ public class Generator {
   private static final Map<Schema, Generex> generexCache = new HashMap<>();
   private static final Map<Schema, List<Object>> optionsCache = new HashMap<>();
   private static final Map<String, Iterator<Object>> iteratorCache = new HashMap<>();
+  private static final Map<Schema, List<String>> domainStringCache = new HashMap<>();
 
   /**
    * The name to use for the top-level JSON property when specifying ARG-specific attributes.
@@ -90,6 +91,12 @@ public class Generator {
    * be used in conjunction with {@link #LENGTH_PROP}. Must be given as a string.
    */
   public static final String REGEX_PROP = "regex";
+
+  /**
+   * The name of the attribute for specifying a domain size for the domain of string values for
+   * this field.
+   */
+  public static final String DOMAIN_PROP = "domain";
 
   /**
    * The name of the attribute for specifying specific values which should be randomly chosen from
@@ -1138,10 +1145,27 @@ public class Generator {
     return new String(bytes, StandardCharsets.US_ASCII);
   }
 
+  private String generateDomainString(Schema schema, Object domainProp, int length) {
+    int domainSz = (Integer)domainProp;
+    domainStringCache.putIfAbsent(schema, new ArrayList<>(domainSz));
+    List<String> domain  = domainStringCache.get(schema);
+    if (domain.size() < domainSz) {
+      String next = generateRandomString(length);
+      domainStringCache.get(schema).add(next);
+      return next;
+    }
+    int off = random.nextInt(domainSz);
+    return domainStringCache.get(schema).get(off);
+  }
+
   private String generateString(Schema schema, Map propertiesProp) {
     Object regexProp = propertiesProp.get(REGEX_PROP);
+    Object domainProp = propertiesProp.get(DOMAIN_PROP);
     if (regexProp != null) {
       return generateRegexString(schema, regexProp, getLengthBounds(propertiesProp));
+    } else if (domainProp != null) {
+      return generateDomainString(
+          schema, domainProp, getLengthBounds(propertiesProp).random());
     } else {
       return generateRandomString(getLengthBounds(propertiesProp).random());
     }

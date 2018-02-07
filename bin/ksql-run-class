@@ -101,12 +101,6 @@ then
   usage
 fi
 
-<<<<<<< HEAD
-=======
-MAIN="$1"
-shift
-
->>>>>>> master
 DAEMON_NAME=""
 GC_LOG_ENABLED=""
 DAEMON_MODE=""
@@ -136,12 +130,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-<<<<<<< HEAD
 MAIN="$1"
 shift
-
-=======
->>>>>>> master
 
 # GC options
 GC_FILE_SUFFIX='-gc.log'

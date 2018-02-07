@@ -19,6 +19,7 @@ package io.confluent.ksql.datagen;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Time;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Objects;
@@ -51,13 +52,6 @@ public class DataGen {
       usage(0);
     }
 
-    Generator generator;
-    try {
-      generator = new Generator(arguments.schemaFile, new Random());
-    } catch (IOException exception) {
-      System.err.printf("IOException encountered: %s%n", exception.getMessage());
-      return;
-    }
     DataGenProducer dataProducer;
 
     switch (arguments.format) {
@@ -83,6 +77,8 @@ public class DataGen {
         return;
     }
 
+    long start = System.currentTimeMillis();
+
     List<Thread> threads = new LinkedList<>();
     for (int i = 0; i < arguments.numThreads; i++) {
       Properties props = arguments.properties;
@@ -99,14 +95,31 @@ public class DataGen {
         return;
       }
 
+      final TimestampGenerator timestampGenerator;
+      if (arguments.timeIncrement > 0) {
+        timestampGenerator = new TimestampGenerator(
+            start, arguments.timeIncrement, arguments.timeBurst);
+      } else {
+        timestampGenerator = null;
+      }
+
+      final Generator generator;
+      try {
+        generator = new Generator(arguments.schemaFile, new Random());
+      } catch (IOException exception) {
+        System.err.printf("IOException encountered: %s%n", exception.getMessage());
+        return;
+      }
+
       Thread t = new Thread(() -> {
         dataProducer.populateTopic(props, generator, arguments.topicName, arguments.keyName,
-            arguments.iterations, arguments.maxInterval, arguments.printRows);
+            arguments.iterations, arguments.maxInterval, arguments.printRows, timestampGenerator);
       });
       t.setDaemon(true);
       t.start();
       threads.add(t);
     }
+
     for (Thread t : threads) {
       try {
         t.join();
@@ -156,6 +169,8 @@ public class DataGen {
     public final Properties properties;
     public final int numThreads;
     public final InputStream propertiesFile;
+    public final long timeIncrement;
+    public final long timeBurst;
 
     public Arguments(
         boolean help,
@@ -169,8 +184,10 @@ public class DataGen {
         String schemaRegistryUrl,
         boolean printRows,
         Properties properties,
-        int numThreads
-        InputStream propertiesFile
+        int numThreads,
+        InputStream propertiesFile,
+        long timeIncrement,
+        long timeBurst
     ) {
       this.help = help;
       this.bootstrapServer = bootstrapServer;
@@ -185,6 +202,8 @@ public class DataGen {
       this.properties = properties;
       this.numThreads = numThreads;
       this.propertiesFile = propertiesFile;
+      this.timeIncrement = timeIncrement;
+      this.timeBurst = timeBurst;
     }
 
     public static class ArgumentParseException extends RuntimeException {
@@ -211,6 +230,8 @@ public class DataGen {
       private Properties properties;
       private int numThreads;
       private InputStream propertiesFile;
+      private long timeIncrement;
+      private long timeBurst;
 
       public Builder() {
         quickstart = null;
@@ -227,6 +248,8 @@ public class DataGen {
         properties = new Properties();
         numThreads = 1;
         propertiesFile = null;
+        timeIncrement = -1;
+        timeBurst = 1;
       }
 
       private enum Quickstart {
@@ -270,7 +293,8 @@ public class DataGen {
       public Arguments build() {
         if (help) {
           return new Arguments(true, null, null, null, null,
-              null, 0, -1, null, true, null, 1, null);
+              null, 0, -1, null, true, null,
+              1, null, -1, -1);
         }
 
         if (quickstart != null) {
@@ -301,7 +325,9 @@ public class DataGen {
             printRows,
             properties,
             numThreads,
-            propertiesFile
+            propertiesFile,
+            timeIncrement,
+            timeBurst
         );
       }
 
@@ -397,6 +423,12 @@ public class DataGen {
           case "propertiesFile":
             propertiesFile = new FileInputStream(argValue);
             break;
+          case "timeIncrement":
+            timeIncrement = parseTimeIncrement(argValue);
+            break;
+          case "timeBurst":
+            timeBurst = parseTimeBurst(argValue);
+            break;
           default:
             throw new ArgumentParseException(String.format(
                 "Unknown argument name in '%s'",
@@ -449,6 +481,38 @@ public class DataGen {
           throw new ArgumentParseException(String.format(
               "Invalid number of threads in '%s'; must be a positive number",
               numThreadsString));
+        }
+      }
+
+      private int parseTimeIncrement(String timeIncrementString) {
+        try {
+          int result = Integer.valueOf(timeIncrementString, 10);
+          if (result < 0) {
+            throw new ArgumentParseException(String.format(
+                "Invalid time increment in '%d'; must be a positive number",
+                result));
+          }
+          return result;
+        } catch (NumberFormatException e) {
+          throw new ArgumentParseException(String.format(
+              "Invalid time increment in '%s'; must be a positive number",
+              timeIncrementString));
+        }
+      }
+
+      private int parseTimeBurst(String timeBurstString) {
+        try {
+          int result = Integer.valueOf(timeBurstString, 10);
+          if (result < 0) {
+            throw new ArgumentParseException(String.format(
+                "Invalid time burst in '%d'; must be a positive number",
+                result));
+          }
+          return result;
+        } catch (NumberFormatException e) {
+          throw new ArgumentParseException(String.format(
+              "Invalid time burst in '%s'; must be a positive number",
+              timeBurstString));
         }
       }
 
