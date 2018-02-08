@@ -57,11 +57,10 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class Generator {
 
-  private static final Schema.Parser schemaParser = new Schema.Parser();
   private static final Map<Schema, Generex> generexCache = new HashMap<>();
   private static final Map<Schema, List<Object>> optionsCache = new HashMap<>();
   private static final Map<String, Iterator<Object>> iteratorCache = new HashMap<>();
-  private static final Map<Schema, List<String>> domainStringCache = new HashMap<>();
+  private final Map<Schema, List<String>> domainStringCache = new HashMap<>();
 
   /**
    * The name to use for the top-level JSON property when specifying ARG-specific attributes.
@@ -195,7 +194,7 @@ public class Generator {
    * @param random The object to use for generating randomness when producing values.
    */
   public Generator(String schemaString, Random random) {
-    this(schemaParser.parse(schemaString), random);
+    this(new Schema.Parser().parse(schemaString), random);
   }
 
   /**
@@ -205,7 +204,7 @@ public class Generator {
    * @throws IOException if an error occurs while reading from the input stream.
    */
   public Generator(InputStream schemaStream, Random random) throws IOException {
-    this(schemaParser.parse(schemaStream), random);
+    this(new Schema.Parser().parse(schemaStream), random);
   }
 
   /**
@@ -215,7 +214,7 @@ public class Generator {
    * @throws IOException if an error occurs while reading from the schema file.
    */
   public Generator(File schemaFile, Random random) throws IOException {
-    this(schemaParser.parse(schemaFile), random);
+    this(new Schema.Parser().parse(schemaFile), random);
   }
 
   /**

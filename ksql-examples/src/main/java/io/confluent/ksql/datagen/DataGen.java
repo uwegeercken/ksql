@@ -19,7 +19,6 @@ package io.confluent.ksql.datagen;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Time;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Objects;
@@ -78,6 +77,21 @@ public class DataGen {
     }
 
     long start = System.currentTimeMillis();
+    String schema = "";
+    while (true) {
+      byte[] b = new byte[256];
+      int ret;
+      try {
+        ret = arguments.schemaFile.read(b);
+      } catch (IOException exception) {
+        System.err.printf("IOException encountered: %s%n", exception.getMessage());
+        return;
+      }
+      if (ret < 0) {
+        break;
+      }
+      schema += new String(b);
+    }
 
     List<Thread> threads = new LinkedList<>();
     for (int i = 0; i < arguments.numThreads; i++) {
@@ -104,12 +118,7 @@ public class DataGen {
       }
 
       final Generator generator;
-      try {
-        generator = new Generator(arguments.schemaFile, new Random());
-      } catch (IOException exception) {
-        System.err.printf("IOException encountered: %s%n", exception.getMessage());
-        return;
-      }
+      generator = new Generator(schema, new Random());
 
       Thread t = new Thread(() -> {
         dataProducer.populateTopic(props, generator, arguments.topicName, arguments.keyName,
