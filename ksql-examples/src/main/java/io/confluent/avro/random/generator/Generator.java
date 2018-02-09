@@ -1148,13 +1148,12 @@ public class Generator {
     int domainSz = (Integer)domainProp;
     domainStringCache.putIfAbsent(schema, new ArrayList<>(domainSz));
     List<String> domain  = domainStringCache.get(schema);
-    if (domain.size() < domainSz) {
+    while (domain.size() < domainSz) {
       String next = generateRandomString(length);
-      domainStringCache.get(schema).add(next);
-      return next;
+      domain.add(next);
     }
     int off = random.nextInt(domainSz);
-    return domainStringCache.get(schema).get(off);
+    return domain.get(off);
   }
 
   private String generateString(Schema schema, Map propertiesProp) {
