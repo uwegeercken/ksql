@@ -1146,7 +1146,7 @@ public class Generator {
 
   private String generateDomainString(Schema schema, Object domainProp, int length) {
     int domainSz = (Integer)domainProp;
-    domainStringCache.putIfAbsent(schema, new ArrayList<>(domainSz));
+    domainStringCache.putIfAbsent(schema, new ArrayList<>());
     List<String> domain  = domainStringCache.get(schema);
     while (domain.size() < domainSz) {
       String next = generateRandomString(length);
