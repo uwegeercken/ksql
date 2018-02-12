@@ -6,7 +6,7 @@
 
 function find_java_home {
   local system=$(uname -s)
-  if (( $system == "Darwin" )); then
+  if [ $system = "Darwin" ]; then
     echo $(/usr/libexec/java_home)
   fi
 }

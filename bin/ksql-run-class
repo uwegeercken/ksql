@@ -83,12 +83,12 @@ fi
 
 # Memory options
 if [ -z "$KSQL_HEAP_OPTS" ]; then
-  KSQL_HEAP_OPTS="-Xmx3g"
+  KSQL_HEAP_OPTS="-Xmx16g"
 fi
 
 # JVM performance options
 if [ -z "$KSQL_JVM_PERFORMANCE_OPTS" ]; then
-  KSQL_JVM_PERFORMANCE_OPTS="-server -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -XX:+CMSScavengeBeforeRemark -XX:+DisableExplicitGC -Djava.awt.headless=true"
+  KSQL_JVM_PERFORMANCE_OPTS="-server -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled -XX:+CMSScavengeBeforeRemark -XX:+DisableExplicitGC -XX:NewRatio=1 -Djava.awt.headless=true"
 fi
 
 usage() {
@@ -100,6 +100,9 @@ if [ $# -lt 1 ];
 then
   usage
 fi
+
+MAIN="$1"
+shift
 
 DAEMON_NAME=""
 GC_LOG_ENABLED=""
@@ -129,9 +132,6 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
-
-MAIN="$1"
-shift
 
 # GC options
 GC_FILE_SUFFIX='-gc.log'
