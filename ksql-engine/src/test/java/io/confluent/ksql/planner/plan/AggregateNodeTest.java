@@ -18,7 +18,6 @@ package io.confluent.ksql.planner.plan;
 
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.TopologyDescription;
 import org.easymock.EasyMock;
@@ -29,17 +28,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
-import io.confluent.ksql.ddl.DdlConfig;
 import io.confluent.ksql.function.FunctionRegistry;
-import io.confluent.ksql.metastore.KsqlStream;
-import io.confluent.ksql.metastore.KsqlTopic;
 import io.confluent.ksql.metastore.MetastoreUtil;
-import io.confluent.ksql.serde.json.KsqlJsonTopicSerDe;
 import io.confluent.ksql.structured.LogicalPlanBuilder;
 import io.confluent.ksql.structured.SchemaKStream;
 import io.confluent.ksql.structured.SchemaKTable;
@@ -47,18 +40,12 @@ import io.confluent.ksql.util.KafkaTopicClient;
 import io.confluent.ksql.util.KsqlConfig;
 import io.confluent.ksql.util.MetaStoreFixture;
 
-import static io.confluent.ksql.planner.plan.PlanTestUtil.MAP_NODE;
+import static io.confluent.ksql.planner.plan.PlanTestUtil.MAPVALUES_NODE;
 import static io.confluent.ksql.planner.plan.PlanTestUtil.SOURCE_NODE;
-import static io.confluent.ksql.planner.plan.PlanTestUtil.TRANSFORM_NODE;
 import static io.confluent.ksql.planner.plan.PlanTestUtil.getNodeByName;
-import static io.confluent.ksql.planner.plan.PlanTestUtil.verifyProcessorNode;
-import static org.easymock.EasyMock.anyInt;
-import static org.easymock.EasyMock.anyShort;
-import static org.easymock.EasyMock.eq;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.junit.Assert.assertTrue;
 
 public class AggregateNodeTest {
@@ -73,7 +60,7 @@ public class AggregateNodeTest {
     final TopologyDescription.Source node = (TopologyDescription.Source) getNodeByName(builder.build(), SOURCE_NODE);
     final List<String> successors = node.successors().stream().map(TopologyDescription.Node::name).collect(Collectors.toList());
     assertThat(node.predecessors(), equalTo(Collections.emptySet()));
-    assertThat(successors, equalTo(Collections.singletonList(MAP_NODE)));
+    assertThat(successors, equalTo(Collections.singletonList(MAPVALUES_NODE)));
     assertThat(node.topics(), equalTo("[test1]"));
   }
 
@@ -94,10 +81,10 @@ public class AggregateNodeTest {
   @Test
   public void shouldHaveSourceNodeForSecondSubtopolgy() {
     buildRequireRekey();
-    final TopologyDescription.Source node = (TopologyDescription.Source) getNodeByName(builder.build(), "KSTREAM-SOURCE-0000000012");
+    final TopologyDescription.Source node = (TopologyDescription.Source) getNodeByName(builder.build(), "KSTREAM-SOURCE-0000000008");
     final List<String> successors = node.successors().stream().map(TopologyDescription.Node::name).collect(Collectors.toList());
     assertThat(node.predecessors(), equalTo(Collections.emptySet()));
-    assertThat(successors, equalTo(Collections.singletonList("KSTREAM-AGGREGATE-0000000009")));
+    assertThat(successors, equalTo(Collections.singletonList("KSTREAM-AGGREGATE-0000000005")));
     assertThat(node.topics(), containsString("[KSQL_Agg_Query_"));
     assertThat(node.topics(), containsString("-repartition]"));
   }
@@ -105,8 +92,8 @@ public class AggregateNodeTest {
   @Test
   public void shouldHaveSinkNodeWithSameTopicAsSecondSource() {
     buildRequireRekey();
-    TopologyDescription.Sink sink = (TopologyDescription.Sink) getNodeByName(builder.build(), "KSTREAM-SINK-0000000010");
-    final TopologyDescription.Source source = (TopologyDescription.Source) getNodeByName(builder.build(), "KSTREAM-SOURCE-0000000012");
+    TopologyDescription.Sink sink = (TopologyDescription.Sink) getNodeByName(builder.build(), "KSTREAM-SINK-0000000006");
+    final TopologyDescription.Source source = (TopologyDescription.Source) getNodeByName(builder.build(), "KSTREAM-SOURCE-0000000008");
     assertThat(sink.successors(), equalTo(Collections.emptySet()));
     assertThat("[" + sink.topic() + "]", equalTo(source.topics()));
   }
@@ -142,10 +129,10 @@ public class AggregateNodeTest {
   }
 
   private SchemaKStream buildRequireRekey() {
-    return buildQuery("SELECT col1, col4, sum(col3), count(col3) FROM test2 window TUMBLING ( "
+    return buildQuery("SELECT col1, sum(col3), count(col3) FROM test1 window TUMBLING ( "
         + "size 2 "
         + "second) "
-        + "WHERE col4 = TRUE GROUP BY col1;");
+        + "GROUP BY col1;");
   }
 
   private SchemaKStream buildQuery(String queryString) {

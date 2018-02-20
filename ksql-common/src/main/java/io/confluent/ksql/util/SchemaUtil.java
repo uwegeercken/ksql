@@ -24,12 +24,14 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.avro.Schema.create;
 import static org.apache.avro.Schema.createArray;
 import static org.apache.avro.Schema.createMap;
+import static org.apache.avro.Schema.createUnion;
 
 public class SchemaUtil {
 
@@ -174,8 +176,8 @@ public class SchemaUtil {
     if (field.schema().type() == Schema.Type.ARRAY) {
       return "ARRAY[" + TYPE_MAP.get(field.schema().valueSchema().type().name()) + "]";
     } else if (field.schema().type() == Schema.Type.MAP) {
-      return "MAP[" + TYPE_MAP.get(field.schema().keySchema().type().name()) + "," +
-             TYPE_MAP.get(field.schema().valueSchema().type().name()) + "]";
+      return "MAP[" + TYPE_MAP.get(field.schema().keySchema().type().name()) + ","
+          + TYPE_MAP.get(field.schema().valueSchema().type().name()) + "]";
     } else {
       return TYPE_MAP.get(field.schema().type().name());
     }
@@ -289,7 +291,7 @@ public class SchemaUtil {
       fieldAssembler
           .name(field.name().replace(".", "_"))
           .type(getAvroSchemaForField(field.schema()))
-          .noDefault();
+          .withDefault(null);
     }
 
     return fieldAssembler.endRecord().toString();
@@ -298,23 +300,29 @@ public class SchemaUtil {
   private static org.apache.avro.Schema getAvroSchemaForField(Schema fieldSchema) {
     switch (fieldSchema.type()) {
       case STRING:
-        return create(org.apache.avro.Schema.Type.STRING);
+        return unionWithNull(create(org.apache.avro.Schema.Type.STRING));
       case BOOLEAN:
-        return create(org.apache.avro.Schema.Type.BOOLEAN);
+        return unionWithNull(create(org.apache.avro.Schema.Type.BOOLEAN));
       case INT32:
-        return create(org.apache.avro.Schema.Type.INT);
+        return unionWithNull(create(org.apache.avro.Schema.Type.INT));
       case INT64:
-        return create(org.apache.avro.Schema.Type.LONG);
+        return unionWithNull(create(org.apache.avro.Schema.Type.LONG));
       case FLOAT64:
-        return create(org.apache.avro.Schema.Type.DOUBLE);
+        return unionWithNull(create(org.apache.avro.Schema.Type.DOUBLE));
       default:
         if (fieldSchema.type() == Schema.Type.ARRAY) {
-          return createArray(getAvroSchemaForField(fieldSchema.valueSchema()));
+          return unionWithNull(
+              createArray(getAvroSchemaForField(fieldSchema.valueSchema())));
         } else if (fieldSchema.type() == Schema.Type.MAP) {
-          return createMap(getAvroSchemaForField(fieldSchema.valueSchema()));
+          return unionWithNull(
+              createMap(getAvroSchemaForField(fieldSchema.valueSchema())));
         }
         throw new KsqlException("Unsupported AVRO type: " + fieldSchema.type().name());
     }
+  }
+
+  private static org.apache.avro.Schema unionWithNull(org.apache.avro.Schema schema) {
+    return createUnion(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.NULL), schema);
   }
 
   /**
@@ -348,5 +356,21 @@ public class SchemaUtil {
       schemaBuilder.field(name, field.schema());
     }
     return schemaBuilder.build();
+  }
+
+  public static int getIndexInSchema(final String fieldName, final Schema schema) {
+    List<Field> fields = schema.fields();
+    for (int i = 0; i < fields.size(); i++) {
+      Field field = fields.get(i);
+      if (field.name().equals(fieldName)) {
+        return i;
+      }
+    }
+    throw new KsqlException(
+        "Couldn't find field with name="
+            + fieldName
+            + " in schema. fields="
+            + fields
+    );
   }
 }

@@ -31,9 +31,14 @@ public class CreateStreamCommand extends AbstractCreateStreamCommand {
       String sqlExpression,
       CreateStream createStream,
       Map<String, Object> overriddenProperties,
-      KafkaTopicClient kafkaTopicClient
+      KafkaTopicClient kafkaTopicClient,
+      boolean enforceTopicExistence
   ) {
-    super(sqlExpression, createStream, overriddenProperties, kafkaTopicClient);
+    super(sqlExpression,
+          createStream,
+          overriddenProperties,
+          kafkaTopicClient,
+          enforceTopicExistence);
   }
 
   @Override
@@ -46,10 +51,12 @@ public class CreateStreamCommand extends AbstractCreateStreamCommand {
         sqlExpression,
         sourceName,
         schema,
-        (keyColumnName.length() == 0) ?
-            null : SchemaUtil.getFieldByName(schema, keyColumnName).orElse(null),
-        (timestampColumnName.length() == 0) ?
-            null : SchemaUtil.getFieldByName(schema, timestampColumnName).orElse(null),
+        (keyColumnName.length() == 0)
+        ? null
+        : SchemaUtil.getFieldByName(schema, keyColumnName).orElse(null),
+        (timestampColumnName.length() == 0)
+        ? null
+        : SchemaUtil.getFieldByName(schema, timestampColumnName).orElse(null),
         metaStore.getTopic(topicName)
     );
 

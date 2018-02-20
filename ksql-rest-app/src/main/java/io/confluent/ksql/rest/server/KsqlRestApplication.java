@@ -20,9 +20,12 @@ package io.confluent.ksql.rest.server;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.jaxrs.base.JsonParseExceptionMapper;
 
+import io.confluent.ksql.rest.server.resources.ServerInfoResource;
+import io.confluent.rest.RestConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serializer;
 import org.eclipse.jetty.util.resource.Resource;
@@ -65,7 +68,7 @@ import io.confluent.ksql.rest.server.computation.CommandStore;
 import io.confluent.ksql.rest.server.computation.StatementExecutor;
 import io.confluent.ksql.rest.server.resources.KsqlExceptionMapper;
 import io.confluent.ksql.rest.server.resources.KsqlResource;
-import io.confluent.ksql.rest.server.resources.ServerInfoResource;
+import io.confluent.ksql.rest.server.resources.RootDocument;
 import io.confluent.ksql.rest.server.resources.StatusResource;
 import io.confluent.ksql.rest.server.resources.streaming.StreamedQueryResource;
 import io.confluent.ksql.util.KafkaTopicClient;
@@ -83,16 +86,16 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
   private static final Logger log = LoggerFactory.getLogger(KsqlRestApplication.class);
 
   public static final String COMMANDS_KSQL_TOPIC_NAME = "__KSQL_COMMANDS_TOPIC";
-  public static final String COMMANDS_STREAM_NAME = "KSQL_COMMANDS";
+  private static final String COMMANDS_STREAM_NAME = "KSQL_COMMANDS";
   private static AdminClient adminClient;
 
   private final KsqlEngine ksqlEngine;
   private final CommandRunner commandRunner;
-  private final ServerInfoResource serverInfoResource;
+  private final RootDocument rootDocument;
   private final StatusResource statusResource;
   private final StreamedQueryResource streamedQueryResource;
   private final KsqlResource ksqlResource;
-  private final boolean enableQuickstartPage;
+  private final boolean isUiEnabled;
 
   private final Thread commandRunnerThread;
   private final VersionCheckerAgent versionChckerAgent;
@@ -109,21 +112,21 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
       KsqlEngine ksqlEngine,
       KsqlRestConfig config,
       CommandRunner commandRunner,
-      ServerInfoResource serverInfoResource,
+      RootDocument rootDocument,
       StatusResource statusResource,
       StreamedQueryResource streamedQueryResource,
       KsqlResource ksqlResource,
-      boolean enableQuickstartPage,
+      boolean isUiEnabled,
       VersionCheckerAgent versionCheckerAgent
   ) {
     super(config);
     this.ksqlEngine = ksqlEngine;
     this.commandRunner = commandRunner;
-    this.serverInfoResource = serverInfoResource;
+    this.rootDocument = rootDocument;
     this.statusResource = statusResource;
     this.streamedQueryResource = streamedQueryResource;
     this.ksqlResource = ksqlResource;
-    this.enableQuickstartPage = enableQuickstartPage;
+    this.isUiEnabled = isUiEnabled;
     this.versionChckerAgent = versionCheckerAgent;
 
     this.commandRunnerThread = new Thread(commandRunner);
@@ -131,7 +134,8 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
 
   @Override
   public void setupResources(Configurable<?> config, KsqlRestConfig appConfig) {
-    config.register(serverInfoResource);
+    config.register(rootDocument);
+    config.register(new ServerInfoResource(new ServerInfo(Version.getVersion())));
     config.register(statusResource);
     config.register(ksqlResource);
     config.register(streamedQueryResource);
@@ -140,7 +144,8 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
 
   @Override
   public ResourceCollection getStaticResources() {
-    if (enableQuickstartPage) {
+    log.info("User interface enabled:" + isUiEnabled);
+    if (isUiEnabled) {
       return new ResourceCollection(Resource.newClassPathResource("/io/confluent/ksql/rest/"));
     } else {
       return super.getStaticResources();
@@ -193,8 +198,8 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
 
     // Don't want to buffer rows when streaming JSON in a request to the query resource
     config.property(ServerProperties.OUTBOUND_CONTENT_LENGTH_BUFFER, 0);
-    if (enableQuickstartPage) {
-      config.property(ServletProperties.FILTER_STATIC_CONTENT_REGEX, "^/quickstart\\.html$");
+    if (isUiEnabled) {
+      config.property(ServletProperties.FILTER_STATIC_CONTENT_REGEX, "/(static/.*|.*html)");
     }
   }
 
@@ -207,7 +212,7 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
     KsqlRestConfig restConfig = new KsqlRestConfig(getProps(cliOptions.getPropertiesFile()));
     KsqlRestApplication app = buildApplication(
         restConfig,
-        cliOptions.getQuickstart(),
+        restConfig.isUiEnabled(),
         new KsqlVersionCheckerAgent()
     );
 
@@ -220,7 +225,7 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
 
   public static KsqlRestApplication buildApplication(
       KsqlRestConfig restConfig,
-      boolean quickstart,
+      boolean isUiEnabled,
       VersionCheckerAgent versionCheckerAgent
   )
       throws Exception {
@@ -243,21 +248,7 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
     }
 
     String commandTopic = restConfig.getCommandTopic();
-
-    try {
-      short replicationFactor = 1;
-      if (restConfig.getOriginals().containsKey(KsqlConfig.SINK_NUMBER_OF_REPLICAS_PROPERTY)) {
-        replicationFactor = Short.parseShort(
-            restConfig
-                .getOriginals()
-                .get(KsqlConfig.SINK_NUMBER_OF_REPLICAS_PROPERTY)
-                .toString()
-        );
-      }
-      topicClient.createTopic(commandTopic, 1, replicationFactor);
-    } catch (KafkaTopicException e) {
-      log.info("Command Topic Exists: " + e.getMessage());
-    }
+    createCommandTopicIfNecessary(restConfig, topicClient, commandTopic);
 
     Map<String, Expression> commandTopicProperties = new HashMap<>();
     commandTopicProperties.put(
@@ -290,7 +281,8 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
             )
         ),
         Collections.emptyMap(),
-        ksqlEngine.getTopicClient()
+        ksqlEngine.getTopicClient(),
+        true
     ));
 
     Map<String, Object> commandConsumerProperties = restConfig.getCommandConsumerProperties();
@@ -325,8 +317,9 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
         commandStore
     );
 
-    ServerInfoResource serverInfoResource =
-        new ServerInfoResource(new ServerInfo(Version.getVersion()));
+    RootDocument rootDocument = new RootDocument(isUiEnabled,
+        restConfig.getList(RestConfig.LISTENERS_CONFIG).get(0));
+
     StatusResource statusResource = new StatusResource(statementExecutor);
     StreamedQueryResource streamedQueryResource = new StreamedQueryResource(
         ksqlEngine,
@@ -346,13 +339,47 @@ public class KsqlRestApplication extends Application<KsqlRestConfig> {
         ksqlEngine,
         restConfig,
         commandRunner,
-        serverInfoResource,
+        rootDocument,
         statusResource,
         streamedQueryResource,
         ksqlResource,
-        quickstart,
+        isUiEnabled,
         versionCheckerAgent
     );
+  }
+
+  static void createCommandTopicIfNecessary(final KsqlRestConfig restConfig,
+                                            final KafkaTopicClient topicClient,
+                                            final String commandTopic) {
+    if (topicClient.isTopicExists(commandTopic)) {
+      return;
+    }
+
+    try {
+      short replicationFactor = 1;
+      if (restConfig.getOriginals().containsKey(KsqlConfig.SINK_NUMBER_OF_REPLICAS_PROPERTY)) {
+        replicationFactor = Short.parseShort(
+            restConfig
+                .getOriginals()
+                .get(KsqlConfig.SINK_NUMBER_OF_REPLICAS_PROPERTY)
+                .toString()
+        );
+      }
+      if(replicationFactor < 2) {
+        log.warn("Creating topic %s with replication factor of %d which is less than 2. "
+            + "This is not advisable in a production environment. ", replicationFactor);
+      }
+
+      // for now we create the command topic with infinite retention so that we
+      // don't lose any data in case of fail over etc.
+      topicClient.createTopic(commandTopic,
+          1,
+          replicationFactor,
+          Collections.singletonMap(TopicConfig.RETENTION_MS_CONFIG,
+              String.valueOf(Long.MAX_VALUE)));
+    } catch (KafkaTopicException e) {
+      log.info("Command Topic Exists: " + e.getMessage());
+    }
   }
 
   private static <T> Serializer<T> getJsonSerializer(boolean isKey) {

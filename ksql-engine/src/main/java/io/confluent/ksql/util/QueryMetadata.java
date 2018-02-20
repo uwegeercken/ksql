@@ -20,13 +20,13 @@ import io.confluent.ksql.serde.DataSource;
 import io.confluent.ksql.planner.plan.OutputNode;
 
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.Topology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
 public class QueryMetadata {
-
   private static final Logger log = LoggerFactory.getLogger(QueryMetadata.class);
   private final String statementString;
   private final KafkaStreams kafkaStreams;
@@ -35,8 +35,7 @@ public class QueryMetadata {
   private final DataSource.DataSourceType dataSourceType;
   private final String queryApplicationId;
   private final KafkaTopicClient kafkaTopicClient;
-  private final String topoplogy;
-
+  private final Topology topoplogy;
 
   public QueryMetadata(final String statementString,
                        final KafkaStreams kafkaStreams,
@@ -45,7 +44,7 @@ public class QueryMetadata {
                        final DataSource.DataSourceType dataSourceType,
                        final String queryApplicationId,
                        final KafkaTopicClient kafkaTopicClient,
-                       String topoplogy) {
+                       final Topology topoplogy) {
     this.statementString = statementString;
     this.kafkaStreams = kafkaStreams;
     this.outputNode = outputNode;
@@ -80,7 +79,7 @@ public class QueryMetadata {
     return queryApplicationId;
   }
 
-  public String getTopoplogy() {
+  public Topology getTopology() {
     return topoplogy;
   }
 
@@ -112,11 +111,15 @@ public class QueryMetadata {
 
   @Override
   public int hashCode() {
-    return Objects.hash(kafkaStreams, outputNode, queryApplicationId);
+    return Objects.hash(statementString, kafkaStreams, outputNode, queryApplicationId);
   }
 
   public void start() {
     log.info("Starting query with application id: {}", queryApplicationId);
     kafkaStreams.start();
+  }
+
+  public String getTopologyDescription() {
+    return topoplogy.describe().toString();
   }
 }
