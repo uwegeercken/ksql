@@ -16,8 +16,8 @@ public class KsqlRocksDBConfigSetter implements RocksDBConfigSetter {
     final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
     tableConfig.setBlockCacheSize(0);
     tableConfig.setBlockSize(4096);
-    //final Filter bloomFilter = new BloomFilter(10);
-    //tableConfig.setFilter(bloomFilter);
+    final Filter bloomFilter = new BloomFilter(10);
+    tableConfig.setFilter(bloomFilter);
     options.setTableFormatConfig(tableConfig);
   }
 }
