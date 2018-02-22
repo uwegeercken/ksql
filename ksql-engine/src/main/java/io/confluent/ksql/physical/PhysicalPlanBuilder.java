@@ -327,6 +327,9 @@ public class PhysicalPlanBuilder {
     newStreamsProperties.putAll(overriddenProperties);
     newStreamsProperties.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationId);
     newStreamsProperties.put(
+        StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG,
+        KsqlRocksDBConfigSetter.class);
+    newStreamsProperties.put(
         ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
         ksqlConfig.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG)
     );
