@@ -51,8 +51,9 @@ public abstract class DataGenProducer {
       int messageCount,
       long maxInterval,
       boolean printRows,
-      TimestampGenerator timestampGenerator
-  ) {
+      TimestampGenerator timestampGenerator,
+      TokenBucket tokenBucket
+  ) throws InterruptedException {
     if (maxInterval < 0) {
       maxInterval = INTER_MESSAGE_MAX_INTERVAL;
     }
@@ -69,7 +70,16 @@ public abstract class DataGenProducer {
 
     SessionManager sessionManager = new SessionManager();
 
+    int tokens = 0;
+
     for (int i = 0; i < messageCount; i++) {
+      if (tokenBucket != null) {
+        if (tokens == 0) {
+          tokens = tokenBucket.take(10);
+        }
+        tokens -= 1;
+      }
+
       Object generatedObject = generator.generate();
 
       if (!(generatedObject instanceof GenericRecord)) {

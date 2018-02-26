@@ -93,6 +93,13 @@ public class DataGen {
       schema += new String(b);
     }
 
+    final TokenBucket tokenBucket;
+    if (arguments.msgRate != -1) {
+      tokenBucket = new TokenBucket(arguments.msgRate, arguments.msgRate);
+    } else {
+      tokenBucket = null;
+    }
+
     List<Thread> threads = new LinkedList<>();
     for (int i = 0; i < arguments.numThreads; i++) {
       Properties props = arguments.properties;
@@ -121,8 +128,13 @@ public class DataGen {
       generator = new Generator(schema, new Random());
 
       Thread t = new Thread(() -> {
-        dataProducer.populateTopic(props, generator, arguments.topicName, arguments.keyName,
-            arguments.iterations, arguments.maxInterval, arguments.printRows, timestampGenerator);
+        try {
+          dataProducer.populateTopic(props, generator, arguments.topicName, arguments.keyName,
+              arguments.iterations, arguments.maxInterval, arguments.printRows, timestampGenerator,
+              tokenBucket);
+        } catch (InterruptedException e) {
+          System.err.println("Producer thread interrupted");
+        }
       });
       t.setDaemon(true);
       t.start();
@@ -180,6 +192,7 @@ public class DataGen {
     public final InputStream propertiesFile;
     public final long timeIncrement;
     public final long timeBurst;
+    public final int msgRate;
 
     public Arguments(
         boolean help,
@@ -196,7 +209,8 @@ public class DataGen {
         int numThreads,
         InputStream propertiesFile,
         long timeIncrement,
-        long timeBurst
+        long timeBurst,
+        int msgRate
     ) {
       this.help = help;
       this.bootstrapServer = bootstrapServer;
@@ -213,6 +227,7 @@ public class DataGen {
       this.propertiesFile = propertiesFile;
       this.timeIncrement = timeIncrement;
       this.timeBurst = timeBurst;
+      this.msgRate = msgRate;
     }
 
     public static class ArgumentParseException extends RuntimeException {
@@ -241,6 +256,7 @@ public class DataGen {
       private InputStream propertiesFile;
       private long timeIncrement;
       private long timeBurst;
+      private int msgRate;
 
       public Builder() {
         quickstart = null;
@@ -259,6 +275,7 @@ public class DataGen {
         propertiesFile = null;
         timeIncrement = -1;
         timeBurst = 1;
+        msgRate = -1;
       }
 
       private enum Quickstart {
@@ -303,7 +320,7 @@ public class DataGen {
         if (help) {
           return new Arguments(true, null, null, null, null,
               null, 0, -1, null, true, null,
-              1, null, -1, -1);
+              1, null, -1, -1, -1);
         }
 
         if (quickstart != null) {
@@ -336,7 +353,8 @@ public class DataGen {
             numThreads,
             propertiesFile,
             timeIncrement,
-            timeBurst
+            timeBurst,
+            msgRate
         );
       }
 
@@ -438,6 +456,9 @@ public class DataGen {
           case "timeBurst":
             timeBurst = parseTimeBurst(argValue);
             break;
+          case "msgRate":
+            msgRate = parseMsgRate(argValue);
+            break;
           default:
             throw new ArgumentParseException(String.format(
                 "Unknown argument name in '%s'",
@@ -522,6 +543,22 @@ public class DataGen {
           throw new ArgumentParseException(String.format(
               "Invalid time burst in '%s'; must be a positive number",
               timeBurstString));
+        }
+      }
+
+      private int parseMsgRate(String msgRateString) {
+        try {
+          int result = Integer.valueOf(msgRateString, 10);
+          if (result < 0) {
+            throw new ArgumentParseException(String.format(
+                "Invalid msg rate in '%d'; must be a positive number",
+                result));
+          }
+          return result;
+        } catch (NumberFormatException e) {
+          throw new ArgumentParseException(String.format(
+              "Invalid msg rate in '%s'; must be a positive number",
+              msgRateString));
         }
       }
 
