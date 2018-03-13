@@ -6,6 +6,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.streams.kstream.TimeWindowedDeserializer;
 import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.test.IntegrationTest;
 import org.apache.kafka.test.TestUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -18,7 +19,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import io.confluent.common.utils.IntegrationTest;
 import io.confluent.ksql.GenericRow;
 import io.confluent.ksql.KsqlContext;
 import io.confluent.ksql.util.KafkaTopicClient;
